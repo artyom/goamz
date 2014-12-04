@@ -315,6 +315,36 @@ type Instance struct {
 	BlockDevices       []BlockDevice   `xml:"blockDeviceMapping>item"`
 }
 
+// ReservedInstance represents details about a EC2 Reserved Instance.
+//
+// See http://goo.gl/YiLDSj for more details.
+type ReservedInstance struct {
+	InstanceId      string          `xml:"reservedInstancesId"`
+	InstanceType    string          `xml:"instanceType"`
+	AvailZone       string          `xml:"availabilityZone"`
+	Start           time.Time       `xml:"start"`
+	Duration        int64           `xml:"duration"`
+	End             time.Time       `xml:"end"`
+	FixedPrice      float64         `xml:"fixedPrice"`
+	UsagePrice      float64         `xml:"usagePrice"`
+	Count           int             `xml:"instanceCount"`
+	Description     string          `xml:"productDescription"`
+	State           string          `xml:"state"`
+	Tags            []Tag           `xml:"tagSet>item"`
+	Tenancy         string          `xml:"instanceTenancy"`
+	Currency        string          `xml:"currencyCode"`
+	Offering        string          `xml:"offeringType"`
+	RecurringCharge RecurringCharge `xml:"recurringCharges"`
+}
+
+// RecurringCharge describes a recurring charge.
+//
+// See http://goo.gl/MkGL47 for more details.
+type RecurringCharge struct {
+	Frequency string  `xml:"frequency"`
+	Amount    float64 `xml:"amount"`
+}
+
 // RunInstances starts new instances in EC2.
 // If options.MinCount and options.MaxCount are both zero, a single instance
 // will be started; otherwise if options.MaxCount is zero, options.MinCount
@@ -872,6 +902,14 @@ type InstancesResp struct {
 	Reservations []Reservation `xml:"reservationSet>item"`
 }
 
+// ReservationsResp is a response to DescribeReservedInstances request.
+//
+// See http://goo.gl/TFkTjf for more details.
+type ReservationsResp struct {
+	RequestId         string             `xml:"requestId"`
+	ReservedInstances []ReservedInstance `xml:"reservedInstancesSet>item"`
+}
+
 // Reservation represents details about a reservation in EC2.
 //
 // See http://goo.gl/0ItPT for more details.
@@ -893,6 +931,23 @@ func (ec2 *EC2) Instances(instIds []string, filter *Filter) (resp *InstancesResp
 	addParamsList(params, "InstanceId", instIds)
 	filter.addParams(params)
 	resp = &InstancesResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+	return
+}
+
+// InstanceReservations returns details about EC2 reserved instances. Both
+// parameters are optional, and if provided will limit reserved instances
+// returned to those mathing given reservations ids or filtering rules.
+//
+// See http://goo.gl/TFkTjf for more details.
+func (ec2 *EC2) InstanceReservations(resIds []string, filter *Filter) (resp *ReservationsResp, err error) {
+	params := makeParams("DescribeReservedInstances")
+	addParamsList(params, "ReservedInstancesId", resIds)
+	filter.addParams(params)
+	resp = &ReservationsResp{}
 	err = ec2.query(params, resp)
 	if err != nil {
 		return nil, err
